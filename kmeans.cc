@@ -54,16 +54,16 @@ typedef std::shared_ptr<std::vector<std::vector<int>>> vector_vector_int_ptr;
 */
 
 template<typename I>
-int find_closest(const Row<I> &row, const std::vector<center_t_ptr<I>> &block)
+int find_closest(const Row<I> &row, const std::vector<center_t_ptr<I>> &centers)
 {
-	if (block.size() == 0) return -1;
-	else if (block.size() == 1) return 0;
+	if (centers.size() == 0) return -1;
+	else if (centers.size() == 1) return 0;
 	int min_index = 0;
-	real_t min_dist = block[0]->squareDist(row);
+	real_t min_dist = centers[0]->squareDist(row);
 	real_t cur_dist;
-	for (size_t i = 1; i < block.size(); ++i)
+	for (size_t i = 1; i < centers.size(); ++i)
 	{
-		cur_dist = block[i]->squareDist(row);
+		cur_dist = centers[i]->squareDist(row);
 		if (cur_dist < min_dist)
 		{
 			min_dist = cur_dist;
@@ -162,6 +162,7 @@ bool update_assignments(const std::vector<center_t_ptr<I>> &centers, const RowBl
 		assignment = find_closest(data[i], centers);
 		if (assignment != assignments[i])
 		{
+			std::cout << ' ';
 			assignments[i] = assignment;
 			changed = true;
 		}
@@ -181,6 +182,7 @@ bool update_assignments(const std::vector<center_t_ptr<I>> &centers, const RowBl
 		assignment = find_p_closest(p, data[i], centers);
 		if (assignment != assignments[i])
 		{
+			std::cout << ' ';
 			assignments[i] = assignment;
 			changed = true;
 		}
@@ -198,15 +200,15 @@ bool update_assignments(const std::vector<center_t_ptr<I>> &centers, const RowBl
 template<typename I>
 void update_centers(std::vector<center_t_ptr<I>> &centers, const RowBlock<I> &data, const std::vector<int> &assignments, int center_type)
 {
+	std::cout << "Updating centers\n";
 	size_t k = centers.size(), n = data.size; 
-	assert(data.size == assignments.size());
+	CHECK(data.size == assignments.size());
 	for (auto c : centers)
 	{
 		c->reset(center_type);
 	}
 	int counts[k];
 	for (int i = 0; i < k; ++i) counts[i] = 0;
-	//std::memset(counts, 0, sizeof(int) * k);
 	// aggregate all points in a cluster
 	for (int i = 0; i < assignments.size(); ++i)
 	{
@@ -235,7 +237,6 @@ void update_centers(std::vector<center_t_ptr<I>> &centers, const RowBlock<I> &da
 	}
 	int counts[k];
 	for (int i = 0; i < k; ++i) counts[i] = 0;
-	//std::memset(counts, 0, sizeof(int) * k);
 	// aggregate all points in a cluster
 	for (int i = 0; i < assignments.size(); ++i)
 	{
@@ -452,6 +453,7 @@ std::pair<vector_int_ptr, vector_center_ptr<I>> kmeans(const RowBlock<I> &data, 
 	else //kmpp
 		centers = kmpp_init(data, k, dim, rng);
 	time = GetTime() - start;
+	
 
 	#if DISTRIBUTED
 	LOG(INFO) << "Initialization done in " << time << " sec";
@@ -467,13 +469,27 @@ std::pair<vector_int_ptr, vector_center_ptr<I>> kmeans(const RowBlock<I> &data, 
 	#endif
 
 	bool changed = true;
-	vector_int_ptr assignments = std::make_shared<std::vector<int>>(data.size);
+	vector_int_ptr assignments = std::make_shared<std::vector<int>>(data.size, 0);
 	start = GetTime();
 	int iter_count = 0;
 	while(changed)
 	{
+		double start1 = GetTime();
 		changed = update_assignments(*centers, data, *assignments);
+		//std::cout << "update Assignment: " << GetTime() - start1 << std::endl;
+		
+		int counts[k] ; 
+		for (int i = 0; i < k; ++i) counts[i] = 0;
+		for (int i = 0; i < assignments->size(); ++i)
+		{
+			++counts[(*assignments)[i]];
+		}
+		for (int i = 0; i < k; ++i) std::cout << counts[i] << ' ';
+		std::cout << std::endl;
+		
+		start1 = GetTime();
 		update_centers(*centers, data, *assignments, center_type);
+		//std::cout << "update centers: " << GetTime() - start1 << std::endl;
 		++iter_count;
 		std::cout << iter_count << ": objective: " << kmeans_objective(data, assignments, centers) << std::endl;
 	}
@@ -698,12 +714,12 @@ int main()
 	using namespace std;
 	std::random_device rd; 
 	std::mt19937_64 rng(rd());
-	dmlc::data::RowBlockContainer<int> rbc = dmlc::data::libsvmread("./rcv.txt");
+	dmlc::data::RowBlockContainer<int> rbc = dmlc::data::libsvmread("./mnist.txt");
 	RowBlock<int> block = rbc.GetBlock();
 	int n = block.size;
 	auto rb = block;
 	int k = 10;
-	int dim = 48000;
+	int dim = 784;
 
 
 	#if 0
@@ -738,9 +754,11 @@ int main()
 	{
 		std::cout << i << ": " << counts[i] << "; " << std::endl;
 	}
+	#if 0
 	std::cout << "-----------------------\n";
 	real_t lb = 0.5 * n / k , ub = 2 * n / k;
 	std::cout << "Bounds: " << lb << ' ' << ub << std::endl;
+	
 	int new_k = merge_and_split(block, assignments, centers, lb, ub, k, dim, rng);
 	
 	int counts1[new_k];
@@ -755,6 +773,7 @@ int main()
 	{
 		std::cout << i << ": " << counts1[i] << "; " << std::endl;
 	}
+	#endif
 	save_data_to_file("./sample_out", block, assignments);
 	
 }
