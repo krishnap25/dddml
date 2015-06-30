@@ -2,6 +2,7 @@
 
 #include "dmlc/data.h"
 #include "data/row_block.h"
+#include "base/localizer.h"
 
 #else
 
@@ -21,6 +22,19 @@ using FeaID = unsigned;
 *	
 	TO-DO: 1. get args from conf file
 */
+
+
+void ReadFile(const char* featureFile, std::vector<FeaID> &features)
+{
+
+
+}
+
+std::vector<FeaID> Intersect(const std::vector<FeaID> &v1, const std::vector<FeaID> &v2)
+{
+
+}
+
 void subsample(
 	const char* featureFile, //name of feature file
 	const char* data_directory,
@@ -32,6 +46,7 @@ void subsample(
 {
 	//RNG: Mersenne-Twister
 	std::mt19937_64 rng (seed);	
+	std::uniform_real_distribution<> dist(0, 1);
 	
 	/* Step 1: Figure out number of files */
 	int nFiles = 1,
@@ -45,7 +60,8 @@ void subsample(
 		
 	/* Step 2: Read some of the blocks at random, and sub-sample */
 	
-	dmlc::data::RowBlockContainer<unsigned> sample;
+	dmlc::data::RowBlockContainer<FeaID> sample;
+	dmlc::data::RowBlockContainer<FeaID> *sample_compressed = new dmlc::data::RowBlockContainer<FeaID>();
 	
 	for (int fi = 0; fi < nFiles; ++fi)
 	{
@@ -61,26 +77,38 @@ void subsample(
 				data_format, mb_size);
 			reader.BeforeFirst();
 			while (reader.Next()) {
-				using std::vector;
-				using std::shared_ptr;
-				using Minibatch = dmlc::data::RowBlockContainer<unsigned>;
-				
 				auto mb = reader.Value(); //row block
 				for (int i = 0; i < mb.size(); ++i)
 				{
 					//decide whether to add row mb[i] to the sample or not
-					
+					if (dist(rng) > 0.5000)
+					{
+						sample.Push(mb[i]);
+					}
 					
 				}
 			}
 		}
 	}
 	/* Step 3: Localize */
+	RowBlock<unsigned> sample1 = sample.GetBlock();
+	/* 3.1: read feature file */
+	int SomeDefaultStartingValue = 10000; //To-Do
+	std::vector<FeaID> features(SomeDefaultStartingValue);
+	ReadFile(featureFile, features);
+	/* 3.2: Get set of features to keep using localizer */
+	Localizer <FeaID> lc;
+	std::vector<FeaID> *uidx = new std::vector<FeaID>();
+	lc.CountUniqIndex<FeaID>(sample1, 4, uidx, NULL);
+	/* 3.3: intersect uidx with features */
+	std::vector<FeaID> idx_dict = Intersect(features, *uidx);
+	/* 3.4: localize */
+	lc.RemapIndex(sample1, idx_dict, sample_compressed);
 	
 	
 	/* Step 4: Write to file */
-
-
+	
+	
 	
 }
 
