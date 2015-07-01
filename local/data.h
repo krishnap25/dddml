@@ -43,7 +43,7 @@ typedef unsigned index_t;
  *      // some computations
  *   }
  * \endcode
- * \tparam DType the data type 
+ * \tparam DType the data type
  */
 template<typename DType>
 class DataIter {
@@ -59,7 +59,7 @@ class DataIter {
 };
 
 /*!
- * \brief one row of training instance 
+ * \brief one row of training instance
  * \tparam IndexType type of index
  */
 template<typename IndexType>
@@ -72,7 +72,7 @@ class Row {
   /*! \brief length of the sparse vector */
   size_t length;
   /*!
-   * \brief index of each instance    
+   * \brief index of each instance
    */
   const IndexType *index;
   /*!
@@ -84,7 +84,7 @@ class Row {
   inline IndexType get_index(size_t i) const {
     return index[i];
   }
-  /*!    
+  /*!
    * \return i-th feature value, this function is always
    *  safe even when value == NULL
    */
@@ -111,11 +111,12 @@ class Row {
         sum += weight[index[i]] * value[i];
       }
     }
+    return sum;
   }
 };
 
 /*!
- * \brief a block of data, containing several rows in sparse matrix 
+ * \brief a block of data, containing several rows in sparse matrix
  *  This is useful for (streaming-sxtyle) algorithms that scans through rows of data
  *  examples include: SGD, GD, L-BFGS, kmeans
  *
@@ -138,7 +139,7 @@ struct RowBlock {
   /*! \brief feature value, can be NULL, indicating all values are 1 */
   const real_t *value;
   /*!
-   * \brief get specific rows in the batch 
+   * \brief get specific rows in the batch
    * \param rowid the rowid in that row
    * \return the instance corresponding to the row
    */
@@ -184,7 +185,7 @@ struct RowBlock {
  *     Parser holds very limited internal state and was usually
  *     used to read data only once
  *
- * \sa Parser 
+ * \sa Parser
  * \tparam IndexType type of index in RowBlock
  *  Create function was only implemented for IndexType uint64_t and uint32_t
  */
