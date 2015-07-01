@@ -1,11 +1,13 @@
 #ifndef RPTS_H
 #define RPTS_H
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
 #include <random>
 #include <vector>
 
+#include "kmeans_helper.h"
 #include "local/row_block.h"
 #include "local/data.h"
 
@@ -86,7 +88,7 @@ unique_ptr<RPTNode<IndexType>> make_rptree(mt19937_64 &rng, int dimension,
                                            int n0, RowBlock<IndexType> data,
                                            vector<IndexType> &idxs) {
   unique_ptr<RPTNode<IndexType>> node(new RPTNode<IndexType>());
-  if (idxs.size() < n0) {
+  if (idxs.size() <= n0) {
     node->idxs = idxs;
   } else {
     node->split = RPTSplit(rng, dimension, data, idxs);
@@ -122,10 +124,27 @@ public:
       : data(data),
         tree(rpt_impl::make_rptree(rng, dimension, n0, data.GetBlock())) {}
 
+  RandomPartitionTree(std::mt19937_64 &rng, int dimension, int n0,
+                      dmlc::data::RowBlockContainer<IndexType> data,
+                      std::vector<IndexType> idxs)
+      : data(data),
+        tree(rpt_impl::make_rptree(rng, dimension, n0, data.GetBlock(), idxs)) {
+  }
+
   auto depth() -> size_t { return tree->depth(); }
 
-private:
+  auto find_nn(dmlc::Row<IndexType> row) -> IndexType {
+    auto lidxs = tree->search(row); // Get the indexes in the correct leaf
+    std::vector<dmlc::real_t> dists(lidxs->size());
+    for (size_t i = 0; i < lidxs->size(); ++i)
+      dists[i] = squareDistBetweenRows(row, data.GetBlock()[(*lidxs)[i]]);
+    int i = std::min_element(dists.begin(), dists.end()) - dists.begin();
+    return (*lidxs)[i];
+  }
+
   dmlc::data::RowBlockContainer<IndexType> data;
+
+private:
   std::unique_ptr<rpt_impl::RPTNode<IndexType>> tree;
 };
 };
