@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <random>
 #include <vector>
@@ -134,12 +135,17 @@ public:
   auto depth() -> size_t { return tree->depth(); }
 
   auto find_nn(dmlc::Row<IndexType> row) -> IndexType {
-    auto lidxs = tree->search(row); // Get the indexes in the correct leaf
-    std::vector<dmlc::real_t> dists(lidxs->size());
-    for (size_t i = 0; i < lidxs->size(); ++i)
-      dists[i] = squareDistBetweenRows(row, data.GetBlock()[(*lidxs)[i]]);
-    int i = std::min_element(dists.begin(), dists.end()) - dists.begin();
-    return (*lidxs)[i];
+    auto leaf_idxs = tree->search(row);
+    real_t min_dist = std::numeric_limits<real_t>::infinity();
+    IndexType best_idx;
+    for (IndexType idx : *leaf_idxs) {
+      real_t dist = squareDistBetweenRows(row, data.GetBlock()[idx]);
+      if (dist < min_dist) {
+        min_dist = dist;
+        best_idx = idx;
+      }
+    }
+    return best_idx;
   }
 
   dmlc::data::RowBlockContainer<IndexType> data;
