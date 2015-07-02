@@ -157,7 +157,7 @@ void subsample(
 
 
 
-int main(int argc, char const *argv[])
+int main()
 {
 	using namespace dddml;
 
