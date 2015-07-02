@@ -72,15 +72,10 @@ template <typename IndexType> struct RPTNode {
   }
 
   inline auto search(Row<IndexType> row) -> const vector<IndexType> * {
-    if (!(left && right)) {
+    if (!(left && right))
       return &idxs;
-    } else {
-      if (split.route(row) == LEFT) {
-        return left->search(row);
-      } else {
-        return right->search(row);
-      }
-    }
+    else
+      return (split.route(row) == LEFT ? left : right)->search(row);
   };
 };
 
@@ -95,7 +90,7 @@ unique_ptr<RPTNode<IndexType>> make_rptree(mt19937_64 &rng, int dimension,
     node->split = RPTSplit(rng, dimension, data, idxs);
     vector<IndexType> left_idxs(0);
     vector<IndexType> right_idxs(0);
-    for (auto idx : idxs) {
+    for (IndexType idx : idxs) {
       if (node->split.route(data[idx]) == LEFT)
         left_idxs.push_back(idx);
       else
