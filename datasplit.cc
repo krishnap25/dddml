@@ -13,11 +13,15 @@
 #endif
 
 #include <cstring>
+#include <algorithm>
 #include <random>
 #include "sample_helper.h"
 
 namespace dddml{
 using FeaID = unsigned;
+using namespace dmlc;
+using namespace dmlc::data;
+
 /*
 *	Sub-sample data
 *	
@@ -31,7 +35,7 @@ void ReadFile(const char* featureFile, std::vector<FeaID> *features)
 	if (file == NULL)
 	{
 		std::cerr << "File doesn't exist\n";
-		exit(-1);
+		//exit(-1);
 	}
 	else
 	{
@@ -40,8 +44,12 @@ void ReadFile(const char* featureFile, std::vector<FeaID> *features)
 
 }
 
-std::vector<FeaID> *Intersect(const std::vector<FeaID> &v1, const std::vector<FeaID> &v2)
+std::vector<FeaID> *Intersect(std::vector<FeaID> &v1, std::vector<FeaID> &v2)
 {
+	// features do not exist
+	if (v1.size() == 0) return &v2;
+	else if (v2.size() == 0) return &v1;
+	//else:
 	std::vector<FeaID> *output = new std::vector<FeaID>();
 	for (int i=0,j=0;((i < v1.size()) && (j < v2.size())); )
 	{
@@ -73,8 +81,6 @@ void subsample(
 	std::mt19937_64 &rng 	
 )
 {
-	std::uniform_real_distribution<> dist(0, 1);
-	std::uniform_int_distribution<int> dis(0, nPartToRead - 1);
 	
 	/* Step 1: Figure out number of files */
 	int nFiles = 1,
@@ -83,9 +89,12 @@ void subsample(
 		mb_size = 1000,
 		partID;
 	//char data_format[] = "libsvm";
+
+	std::uniform_real_distribution<> dist(0, 1);
+	std::uniform_int_distribution<int> dis(0, nPartToRead - 1);
 	
-	real_t probability_of_selecting_one_row = (static_cast<real_t> (subsample)) / total_size * nPartPerFile / nPartToRead; //TODO: Check.
-	probability_of_selecting_one_row = std::min(1, probability_of_selecting_one_row);
+	real_t probability_of_selecting_one_row = (static_cast<real_t> (subsample_size)) / total_size * nPartPerFile / nPartToRead; //TODO: Check.
+	probability_of_selecting_one_row = (probability_of_selecting_one_row > 1.0) ? 1.0 : probability_of_selecting_one_row;
 		
 	/* Step 2: Read some of the blocks at random, and sub-sample */
 	
@@ -144,14 +153,25 @@ void subsample(
 	sample_compressed->Save(output);
 }
 
-} //namespace ddmlc
+} //namespace dddml
 
 
 
 int main(int argc, char const *argv[])
 {
+	using namespace dddml;
+
 	std::random_device rd;
 	std::mt19937_64 rng (rd());	
+	char featureFile[] = "features.txt";
+	char data_directory[] = "./data/mnist.txt";
+	char outputFile[] = "./data/mnist.out";
+	char data_format[] = "libsvm";
+	int subsample_size = 1000;
+	int total_size = 60000;
+
+	subsample(featureFile, data_directory, outputFile,data_format, subsample_size, total_size, rng);
+	
 	return 0;
 }
 
