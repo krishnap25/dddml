@@ -1,9 +1,6 @@
 #ifndef RPTS_H
 #define RPTS_H
 
-#include <algorithm>
-#include <iostream>
-#include <limits>
 #include <memory>
 #include <random>
 #include <vector>
