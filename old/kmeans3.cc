@@ -1,7 +1,7 @@
 #include <string>
 #include <random>
 #include <vector>
-#include "kmeans_helper.h"
+#include "kmeans_helper3.h"
 #include "sample_helper.h"
 #include <memory>
 #include <queue>
@@ -55,9 +55,8 @@ using namespace dmlc::data;
 * /return true if any assignments have changed. False otherwise
 */
 template<typename I>
-bool update_assignments(centers_t &centers, const RowBlock<I> &data, std::vector<int> &assignments)
+bool update_assignments(real_t *const*centers, const RowBlock<I> &data, std::vector<int> &assignments, size_t dim, int k)
 {
-	size_t dim = centers.dim; int k = centers.k;
 	size_t n = data.size; 
 	assert(data.size == assignments.size());
 	bool changed = false;
@@ -65,7 +64,7 @@ bool update_assignments(centers_t &centers, const RowBlock<I> &data, std::vector
 	for (size_t i = 0; i < n; ++i)
 	{
 
-		assignment = find_closest(data[i], centers);//, dim, k);
+		assignment = find_closest(data[i], centers, dim, k);
 		if (assignment != assignments[i])
 		{
 			assignments[i] = assignment;
@@ -76,9 +75,8 @@ bool update_assignments(centers_t &centers, const RowBlock<I> &data, std::vector
 }
 
 template<typename I>
-bool update_assignments(centers_t &centers, const RowBlock<I> &data, std::vector<std::vector<int>> &assignments)
+bool update_assignments(real_t *const*centers, const RowBlock<I> &data, std::vector<std::vector<int>> &assignments, size_t dim, int k)
 {
-	size_t dim = centers.dim; int k = centers.k;
 	size_t  p = assignments[0].size(), n = data.size; 
 	assert(data.size == assignments.size());
 	bool changed = false;
@@ -103,13 +101,15 @@ bool update_assignments(centers_t &centers, const RowBlock<I> &data, std::vector
 */
 
 template<typename I>
-void update_centers(centers_t &centers, const RowBlock<I> &data, const std::vector<int> &assignments)
+void update_centers(real_t **centers, const RowBlock<I> &data, const std::vector<int> &assignments, size_t dim, int k)
 {
-	size_t dim = centers.dim; int k = centers.k;
 	//std::cout << "Updating centers\n";
 	size_t n = data.size; 
 	CHECK(data.size == assignments.size());
-	centers.reset();
+	for (int i = 0; i < k; ++i)
+	{
+		reset(centers[i], dim);
+	}
 	int counts[k];
 	for (int i = 0; i < k; ++i) counts[i] = 0;
 	// aggregate all points in a cluster
@@ -130,14 +130,14 @@ void update_centers(centers_t &centers, const RowBlock<I> &data, const std::vect
 
 
 template<typename I>
-void update_centers(centers_t &centers, const RowBlock<I> &data, const std::vector<std::vector<int>> &assignments)
+void update_centers(real_t **centers, const RowBlock<I> &data, const std::vector<std::vector<int>> &assignments, size_t dim, int k)
 {
-	size_t dim = centers.dim; int k = centers.k;
 	size_t p = assignments[0].size(), n = data.size; 
 	assert(data.size == assignments.size());
-	
-	centers.reset();
-
+	for (int i = 0; i < k; ++i)
+	{
+		reset(centers[i], dim);
+	}
 	int counts[k];
 	for (int i = 0; i < k; ++i) counts[i] = 0;
 	// aggregate all points in a cluster
@@ -169,9 +169,8 @@ void update_centers(centers_t &centers, const RowBlock<I> &data, const std::vect
 */
 
 template<typename I>
-void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::vector<int> &assignments, int center_id)
+void update_one_center(real_t **centers, const RowBlock<I> &data, const std::vector<int> &assignments, int center_id, size_t dim)
 {
-	size_t dim = centers.dim; int k = centers.k;
 	size_t n = data.size; 
 	assert(data.size == assignments.size());
 	
@@ -193,9 +192,8 @@ void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::v
 
 
 template<typename I>
-void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::vector<std::vector<int>> &assignments, int center_id)
+void update_one_center(real_t **centers, const RowBlock<I> &data, const std::vector<std::vector<int>> &assignments, int center_id, size_t dim)
 {
-	size_t dim = centers.dim; int k = centers.k;
 	size_t p = assignments[0].size(), n = data.size; 
 	assert(data.size == assignments.size());
 	reset(centers[center_id], dim);
@@ -221,12 +219,12 @@ void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::v
 * Pick up random centers to initialize k-means (code: 0)
 */
 template<typename I>
-centers_t random_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng)
+real_t **random_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng)
 {
 	size_t numData = data.size;
 	int *sample = SampleWithoutReplacement(k, numData, rng);
 	//alternative 1:
-	centers_t centers(dim, k);
+	real_t **centers = initialize_centers(dim, k);
 	for (int i = 0; i < k; ++i)
 	{
 		add_into(centers[i], dim, data[sample[i]]);
@@ -239,13 +237,13 @@ centers_t random_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_6
 *	k-means++ initialization (code: 1)
 */
 template<typename I>
-centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng)
+real_t **kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng)
 {
 	real_t weight; 
-	centers_t centers(dim, k);
+	real_t **centers = initialize_centers(dim, k);
 
 	size_t numData = data.size;
-	real_t sqdists[numData]; //distances
+	real_t *sqdists = new real_t[numData]; //distances
 	for (int i = 0; i < numData; ++i) sqdists[i] = 0;
 	// initialize first center
 	std::uniform_int_distribution<> dis(0, numData-1);
@@ -272,13 +270,13 @@ centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 
 			sqdists[j] = std::min(sqdists[j], squareDist(data[j], centers[i], dim));
 		}
 	}
+	delete[] sqdists;
 	return centers;	
 }
 
 template<typename I>
-real_t kmeans_objective(const RowBlock<I> &data, vector_int_ptr assignments, centers_t &centers)
+real_t kmeans_objective(const RowBlock<I> &data, vector_int_ptr assignments, real_t **centers, size_t dim, int k)
 {
-	size_t dim = centers.dim; int k = centers.k;
 	size_t n = data.size;
 	real_t obj = 0;
 	int count = 0;
@@ -296,9 +294,8 @@ real_t kmeans_objective(const RowBlock<I> &data, vector_int_ptr assignments, cen
 }
 
 template<typename I>
-real_t kmeans_objective(const RowBlock<I> &data, vector_vector_int_ptr assignments, centers_t &centers)
+real_t kmeans_objective(const RowBlock<I> &data, vector_vector_int_ptr assignments, real_t **centers, size_t dim, int k)
 {
-	size_t dim = centers.dim; int k = centers.k;
 	size_t n = data.size;
 	int p = (*assignments)[0].size();
 	int count = 0;
@@ -324,7 +321,7 @@ real_t kmeans_objective(const RowBlock<I> &data, vector_vector_int_ptr assignmen
 * ----------------------------------------------------------------------
 */
 template<typename I>
-std::pair<vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng, int init )
+std::pair<vector_int_ptr, real_t**> kmeans(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng, int init )
 {
 	double start, time;
 	
@@ -339,7 +336,7 @@ std::pair<vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, size
 	std::cout << "Initializing centers.." << std::endl;
 	#endif
 
-	centers_t centers(dim, k);
+	real_t **centers;
 	start = GetTime();
 	if (init == 0) 
 		centers = random_init(data, k, dim, rng);
@@ -368,8 +365,8 @@ std::pair<vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, size
 	while(changed)
 	{
 		double start1 = GetTime();
-		changed = update_assignments(centers, data, *assignments);//, dim, k);
-		//std::cout << "\tupdate Assignment: " << GetTime() - start1 << std::endl;
+		changed = update_assignments(centers, data, *assignments, dim, k);
+		std::cout << "\tupdate Assignment: " << GetTime() - start1 << std::endl;
 		
 		int counts[k] ; 
 		for (int i = 0; i < k; ++i) counts[i] = 0;
@@ -381,10 +378,10 @@ std::pair<vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, size
 		std::cout << std::endl;
 		
 		start1 = GetTime();
-		update_centers(centers, data, *assignments);
-		//std::cout << "\tupdate centers: " << GetTime() - start1 << std::endl;
+		update_centers(centers, data, *assignments, dim, k);
+		std::cout << "\tupdate centers: " << GetTime() - start1 << std::endl;
 		++iter_count;
-		std::cout << iter_count << ": objective: " << kmeans_objective(data, assignments, centers) << std::endl;
+		std::cout << iter_count << ": objective: " << kmeans_objective(data, assignments, centers, dim, k) << std::endl;
 	}
 	time = GetTime() - start;
 
@@ -394,11 +391,11 @@ std::pair<vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, size
 	std::cout << "Finished k-means: " << iter_count << " iterations in " << time << " sec" << std::endl;
 	#endif
 
-	return std::pair<vector_int_ptr, centers_t>(assignments, centers);
+	return std::pair<vector_int_ptr, real_t**>(assignments, centers);
 }
 
 template<typename I>
-std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, int p, size_t dim, int center_type, std::mt19937_64 &rng, int init)
+std::pair<vector_vector_int_ptr, real_t**> kmeans(const RowBlock<I> &data, int k, int p, size_t dim, int center_type, std::mt19937_64 &rng, int init)
 {
 	double start, time;
 	
@@ -413,7 +410,7 @@ std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int 
 	std::cout << "Initializing centers.." << std::endl;
 	#endif
 
-	centers_t centers(dim, k);
+	real_t **centers;
 	start = GetTime();
 	if (init == 0) 
 		centers = random_init(data, k, dim, rng);
@@ -452,7 +449,7 @@ std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int 
 	std::cout << "Finished k-means: " << iter_count << " iterations in " << time << " sec" << std::endl;
 	#endif
 
-	return std::pair<vector_vector_int_ptr, centers_t>(assignments, centers);
+	return std::pair<vector_vector_int_ptr, real_t**>(assignments, centers);
 }
 
 
@@ -470,7 +467,7 @@ void save_data_to_file(const char *filename, const RowBlock<I> &data, vector_vec
 
 
 template<typename I>
-void save_centers_to_file(Stream *fo, centers_t &centers)
+void save_centers_to_file(Stream *fo, real_t **centers, size_t dim, int k)
 {
 	//TODO
 }
@@ -490,7 +487,7 @@ std::vector<int> _ones(int len)
 }
 
 template <typename I>
-int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers_t &centers, real_t lower_bound, real_t upper_bound, int k, size_t dim, std::mt19937_64 &rng)
+int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, real_t **centers, real_t lower_bound, real_t upper_bound, int k, size_t dim, std::mt19937_64 &rng)
 {
 	//preprocess
 	int current_k = k;
@@ -515,7 +512,7 @@ int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers
 		{
 			//cluster too small. Need to merge it with nearest cluster.
 			deleted_indices.push_back(i);
-			int new_index = find_closest(centers, i);
+			int new_index = find_closest(centers, i, dim, k);
 			++nmerge;
 			counts[new_index] += counts[i];
 			counts[i] = -1; //destroyed cluster
@@ -526,7 +523,7 @@ int merge_and_split(const RowBlock<I> &data, vector_int_ptr assignments, centers
 				if ((*assignments)[j] == i) (*assignments)[j] = new_index;
 			}
 			//update center:
-			update_one_center(centers, data, (*assignments), new_index);
+			update_one_center(centers, data, (*assignments), new_index, dim);
 		}
 	}
 	//modify upper bound (it gets looser) and leave lower bound intact
@@ -647,7 +644,7 @@ int main()
 	{
 		std::cout << i << ": " << counts[i] << "; " << std::endl;
 	}
-	
+	#if 0
 	std::cout << "-----------------------\n";
 	real_t lb = 0.5 * n / k , ub = 2 * n / k;
 	std::cout << "Bounds: " << lb << ' ' << ub << std::endl;
@@ -666,8 +663,7 @@ int main()
 	{
 		std::cout << i << ": " << counts1[i] << "; " << std::endl;
 	}
-	//#endif
-	centers.destroy();
+	#endif
 	save_data_to_file("./sample_out", block, assignments);
 	
 }

@@ -36,69 +36,30 @@ typedef std::shared_ptr<std::vector<int>> vector_int_ptr;
 
 typedef std::shared_ptr<std::vector<std::vector<int>>> vector_vector_int_ptr;
 
-class centers_t
-{
-	real_t *array;
-
-public:
-	size_t dim;
-	int k;
-	real_t* operator[](size_t row_id)
-	{
-		return &(array[row_id * dim]);
-	}
-	// real_t* const operator[](size_t row_id) 
-	// {
-	// 	return &(array[row_id * dim]);
-	// }
-	centers_t(size_t dim, int k)
-	{
-		this->dim = dim;
-		this-> k = k;
-		array = new real_t[dim*k];
-		std::memset(array, 0, sizeof(real_t)*dim*k);
-	}
-	~centers_t(){} 
-	// no automatic destructor. Call destroy() on completion
-	void destroy()
-	{
-		if (array != NULL)
-			delete[] array;
-		else
-			std::cout << "null pointer \n";
-	}
-	void reset()
-	{
-		std::memset(array, 0, sizeof(real_t) * dim * k);
-	}
-	
-};
-
-
 template<typename I>
-bool update_assignments( centers_t &centers, const RowBlock<I> &data, std::vector<int> &assignments);
+bool update_assignments( real_t *const*centers, const RowBlock<I> &data, std::vector<int> &assignments, size_t dim, int k);
 template<typename I>
-bool update_assignments( centers_t &centers, const RowBlock<I> &data, std::vector<std::vector<int>> &assignments);
+bool update_assignments( real_t *const*centers, const RowBlock<I> &data, std::vector<std::vector<int>> &assignments, size_t dim, int k);
 template<typename I>
-void update_centers(centers_t &centers, const RowBlock<I> &data, const std::vector<int> &assignments);
+void update_centers(real_t **centers, const RowBlock<I> &data, const std::vector<int> &assignments, size_t dim, int k);
 template<typename I>
-void update_centers(centers_t &centers, const RowBlock<I> &data, const std::vector<std::vector<int>> &assignments);
+void update_centers(real_t **centers, const RowBlock<I> &data, const std::vector<std::vector<int>> &assignments, size_t dim, int k);
 template<typename I>
-void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::vector<int> &assignments, int center_id);
+void update_one_center(real_t **centers, const RowBlock<I> &data, const std::vector<int> &assignments, int center_id, size_t dim);
 template<typename I>
-void update_one_center(centers_t &centers, const RowBlock<I> &data, const std::vector<std::vector<int>> &assignments, int center_id);
+void update_one_center(real_t **centers, const RowBlock<I> &data, const std::vector<std::vector<int>> &assignments, int center_id, size_t dim);
 template<typename I>
-centers_t random_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng);
+real_t **random_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng);
 template<typename I>
-centers_t kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng);
+real_t **kmpp_init(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng);
 template<typename I>
-real_t kmeans_objective(const RowBlock<I> &data, vector_int_ptr assignments, centers_t &centers);
+real_t kmeans_objective(const RowBlock<I> &data, vector_int_ptr assignments, real_t **centers, size_t dim, int k);
 template<typename I>
-real_t kmeans_objective(const RowBlock<I> &data, vector_vector_int_ptr assignments, centers_t &centers);
+real_t kmeans_objective(const RowBlock<I> &data, vector_vector_int_ptr assignments, real_t **centers, size_t dim, int k);
 template<typename I>
-std::pair<vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng, int init = 1);
+std::pair<vector_int_ptr, real_t**> kmeans(const RowBlock<I> &data, int k, size_t dim, std::mt19937_64 &rng, int init = 1);
 template<typename I>
-std::pair<vector_vector_int_ptr, centers_t> kmeans(const RowBlock<I> &data, int k, int p, size_t dim, int center_type, std::mt19937_64 &rng, int init = 1);
+std::pair<vector_vector_int_ptr, real_t**> kmeans(const RowBlock<I> &data, int k, int p, size_t dim, int center_type, std::mt19937_64 &rng, int init = 1);
 
 
 
@@ -223,22 +184,22 @@ inline real_t **initialize_centers(size_t dim, int k)
 	return centers;
 }
 
-// inline void destroy_center(real_t *arr)
-// {
-// 	CHECK(arr != NULL);
-// 	delete[] arr;
-// }
+inline void destroy_center(real_t *arr)
+{
+	CHECK(arr != NULL);
+	delete[] arr;
+}
 
-// inline void destroy_centers(real_t **centers, int k)
-// {
-// 	CHECK(centers != NULL);
-// 	for (int i = 0; i < k; ++i)
-// 	{
-// 		CHECK(centers[i] != NULL);
-// 		delete[] centers[i];
-// 	}
-// 	delete[] centers;
-// }
+inline void destroy_centers(real_t **centers, int k)
+{
+	CHECK(centers != NULL);
+	for (int i = 0; i < k; ++i)
+	{
+		CHECK(centers[i] != NULL);
+		delete[] centers[i];
+	}
+	delete[] centers;
+}
 
 
 /*
@@ -246,9 +207,8 @@ inline real_t **initialize_centers(size_t dim, int k)
 */
 
 template<typename I>
-int find_closest(const Row<I> &row, centers_t &centers)
+int find_closest(const Row<I> &row, real_t *const*centers, size_t dim, int k)
 {
-	size_t dim = centers.dim; int k = centers.k;
 	if (k == 0) return -1;
 	else if (k == 1) return 0;
 	int min_index = 0;
@@ -271,9 +231,9 @@ int find_closest(const Row<I> &row, centers_t &centers)
 /*
 * Find closest point from vector ignoring index i
 */
-int find_closest(centers_t &all_centers, int center)
+int find_closest( real_t *const*all_centers, int center, size_t dim, int k)
 {
-	size_t dim = all_centers.dim; int k = all_centers.k;
+	CHECK(all_centers != NULL);
 	int min_index = (center != 0) ? 0 : 1;
 	real_t min_dist = squareDist(all_centers[min_index], all_centers[center], dim);
 	real_t cur_dist = 0.;
@@ -297,9 +257,8 @@ int find_closest(centers_t &all_centers, int center)
 }
 
 template<typename I>
-int *find_p_closest(int p, const Row<I> &row,  centers_t &centers)
+int *find_p_closest(int p, const Row<I> &row,  real_t *const*centers, size_t dim, int k)
 {
-	size_t dim = centers.dim; int k = centers.k;
 	if (k < p)
 	{
 	//should not occur:
