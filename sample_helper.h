@@ -19,12 +19,12 @@ int *SampleWithoutReplacement(unsigned size, unsigned range, std::mt19937_64 &rn
 	
 	int arr [range];
 	int *ret = new int[size];
-	for (int i = 1; i <= range; ++i) arr[i] = i;
+	for (unsigned i = 1; i <= range; ++i) arr[i] = i;
 	
 	int last = range; 
-	int rnd, temp;
+	int rnd;
 	std::uniform_int_distribution<int> dunif(0, last-1);
-	for (int i = 0; i < size; ++i)
+	for (unsigned i = 0; i < size; ++i)
 	{
 		rnd = dunif(rng);
 		ret[i] = arr[rnd];

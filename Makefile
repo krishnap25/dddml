@@ -24,7 +24,7 @@ bin/%.o: %.cc
 #%.pb.cc %.pb.h : %.proto
 #	${DEPS_PATH}/bin/protoc --cpp_out=. --proto_path=. $<
 
-bin/datasplit:  ../base/base.a 
+bin/datasplit: bin/datasplit.o  ../base/base.a 
 	$(CXX) $(CFLAGS) $(filter %.o %.a, $^) $(LDFLAGS) -o $@
 
 -include bin/*.d

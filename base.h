@@ -1,3 +1,3 @@
 #pragma once
 
-#define DISTRIBUTED false
+#define DISTRIBUTED true

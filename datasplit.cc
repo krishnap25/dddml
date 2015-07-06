@@ -2,8 +2,8 @@
 
 #include "dmlc/data.h"
 #include "data/row_block.h"
-#include "base/localizer.h"
-#include "base/minibatch_iter.h"
+#include "../base/localizer.h"
+#include "../base/minibatch_iter.h"
 
 #else
 
@@ -19,8 +19,8 @@
 
 namespace dddml{
 using FeaID = unsigned;
-using namespace dmlc;
-using namespace dmlc::data;
+//using namespace dmlc;
+//using namespace dmlc::data;
 
 /*
 *	Sub-sample data
@@ -31,7 +31,7 @@ using namespace dmlc::data;
 
 void ReadFile(const char* featureFile, std::vector<FeaID> *features)
 {
-	Stream *file = Stream::Create(featureFile, "r", true);
+	dmlc::Stream *file = dmlc::Stream::Create(featureFile, "r", true);
 	if (file == NULL)
 	{
 		std::cerr << "File doesn't exist\n";
@@ -51,7 +51,7 @@ std::vector<FeaID> *Intersect(std::vector<FeaID> &v1, std::vector<FeaID> &v2)
 	else if (v2.size() == 0) return &v1;
 	//else:
 	std::vector<FeaID> *output = new std::vector<FeaID>();
-	for (int i=0,j=0;((i < v1.size()) && (j < v2.size())); )
+	for (unsigned i=0,j=0;((i < v1.size()) && (j < v2.size())); )
 	{
 		if (v1[i] == v2[j])
 		{
@@ -81,6 +81,7 @@ void subsample(
 	std::mt19937_64 &rng 	
 )
 {
+using real_t = dmlc::real_t;
 	
 	/* Step 1: Figure out number of files */
 	int nFiles = 1,
@@ -128,14 +129,14 @@ void subsample(
 		}
 	}
 	/* Step 3: Localize */
-	RowBlock<unsigned> sample1 = sample.GetBlock();
+	dmlc::RowBlock<unsigned> sample1 = sample.GetBlock();
 	/* 3.1: read feature file */
 	int SomeDefaultStartingValue = 10000; //TODO
 	std::vector<FeaID> features;
 	features.reserve(SomeDefaultStartingValue);
 	ReadFile(featureFile, &features);
 	/* 3.2: Get set of features to keep using localizer */
-	Localizer <FeaID> lc;
+	dmlc::Localizer <FeaID> lc;
 	std::vector<FeaID> *uidx = new std::vector<FeaID>();
 	lc.CountUniqIndex<FeaID>(sample1, 4, uidx, NULL);
 	/* 3.3: intersect uidx with features */
@@ -148,9 +149,10 @@ void subsample(
 	
 	//First write idx_dict. Then write compressed sample.
 
-	Stream *output = Stream::Create(outputFile, "w");
+	dmlc::Stream *output = dmlc::Stream::Create(outputFile, "w");
 	output->Write(*idx_dict);
 	sample_compressed->Save(output);
+	
 }
 
 } //namespace dddml
