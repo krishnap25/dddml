@@ -1,3 +1,5 @@
+#include "base.h"
+
 #if DISTRIBUTED
 
 #include "dmlc/data.h"
@@ -19,8 +21,8 @@
 
 namespace dddml{
 using FeaID = unsigned;
-//using namespace dmlc;
-//using namespace dmlc::data;
+using namespace dmlc;
+using namespace dmlc::data;
 
 /*
 *	Sub-sample data
@@ -89,7 +91,6 @@ using real_t = dmlc::real_t;
 		nPartToRead = 10,
 		mb_size = 1000,
 		partID;
-	//char data_format[] = "libsvm";
 
 	std::uniform_real_distribution<> dist(0, 1);
 	std::uniform_int_distribution<int> dis(0, nPartToRead - 1);
@@ -110,13 +111,13 @@ using real_t = dmlc::real_t;
 			//TODO: verify filename
 			char filename[200];
 			std::sprintf(filename, "%s/%d", data_directory, fi);
-			dmlc::data::MinibatchIter<FeaID> reader(
+			MinibatchIter<FeaID> reader(
 				filename, partID, nPartPerFile,
 				data_format, mb_size);
 			reader.BeforeFirst();
 			while (reader.Next()) {
 				auto mb = reader.Value(); //row block
-				for (int i = 0; i < mb.size(); ++i)
+				for (size_t i = 0; i < mb.size; ++i)
 				{
 					//decide whether to add row mb[i] to the sample or not
 					if (dist(rng) < probability_of_selecting_one_row)
@@ -138,7 +139,7 @@ using real_t = dmlc::real_t;
 	/* 3.2: Get set of features to keep using localizer */
 	dmlc::Localizer <FeaID> lc;
 	std::vector<FeaID> *uidx = new std::vector<FeaID>();
-	lc.CountUniqIndex<FeaID>(sample1, 4, uidx, NULL);
+	lc.CountUniqIndex<FeaID>(sample1, /*4,*/ uidx, NULL); //include nthreads = 4 for older version
 	/* 3.3: intersect uidx with features */
 	std::vector<FeaID> *idx_dict = Intersect(features, *uidx);
 	/* 3.4: localize */
@@ -162,7 +163,6 @@ using real_t = dmlc::real_t;
 int main()
 {
 	using namespace dddml;
-
 	std::random_device rd;
 	std::mt19937_64 rng (rd());	
 	char featureFile[] = "features.txt";
